@@ -74,7 +74,7 @@ droption_t<std::string> op_module_file(
     "If the file is named modules.log and is in the same directory as the trace file, "
     "or a raw/ subdirectory below the trace file, this parameter can be omitted.");
 
-droption_t<unsigned int> op_num_cores(DROPTION_SCOPE_FRONTEND, "cores", 4,
+droption_t<unsigned int> op_num_cores(DROPTION_SCOPE_FRONTEND, "cores", 1,
                                       "Number of cores",
                                       "Specifies the number of cores to simulate.");
 
