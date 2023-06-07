@@ -575,13 +575,15 @@ memtrace(void *drcontext, bool skip_size_cap)
             }
             if (!pageTableWasDumped) {
               std::cerr << "Page table dump module was attached to PID=" << std::to_string(getpid()) << std::endl;
-              system((std::string("echo ") + std::to_string(getpid()) + " > /proc/page_tables").c_str());
-              system((std::string("cat /proc/page_tables > ") + op_outdir.get_value().c_str() + "/pt_dump_raw").c_str());
+			  system((std::string("/root/mitosis-page-table-dump/bin/page-table-dump ")
+						  + std::to_string(getpid()) + std::string(" 0 > ")
+						  + op_outdir.get_value().c_str() + "/pt_dump_raw").c_str());
               system((std::string("cat /proc/" + std::to_string(getpid()) + "/maps > ") + op_outdir.get_value().c_str() + "/proc_maps").c_str());
               
               if (op_VM_name.get_value() != "") {
-                system((std::string("/disk/local/neuralwalkers/linux/kvm/exec_in_host.sh 22 /disk/local/neuralwalkers/linux/kvm/dump_ept.sh ") + " " + op_VM_name.get_value().c_str() + " > " + op_outdir.get_value().c_str() + "/vm_pt_dump_raw").c_str()) ;
-                std::cerr << (std::string("/disk/local/neuralwalkers/linux/kvm/exec_in_host.sh 22 /disk/local/neuralwalkers/linux/kvm/dump_ept.sh ") + " " + op_VM_name.get_value().c_str() + " > " + op_outdir.get_value().c_str() + "/vm_pt_dump_raw").c_str();
+                system((std::string("/root/workspace/exec_in_host.sh > ") + op_outdir.get_value().c_str() + "/vm_pt_dump_raw").c_str()) ;
+				//system((std::string("/root/workspace/exec_in_host.sh >") + " " + op_VM_name.get_value().c_str() + " > " + op_outdir.get_value().c_str() + "/vm_pt_dump_raw").c_str()) ;
+                std::cerr << (std::string("/root/workspace/exec_in_host.sh > ") + op_outdir.get_value().c_str() + "/vm_pt_dump_raw").c_str();
               }
               pageTableWasDumped = true;
             }
