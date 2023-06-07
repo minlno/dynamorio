@@ -66,9 +66,9 @@ $TRACER_DIR/build/bin64/drrun -t drcachesim                  \
                               -verbose 1                     \
                               -enabler_filename $ENABLE_FILE \
                               -trace_after_instrs 1          \
-                              -exit_after_tracing 2000000000      \
-		              -VM_name test1                 \
-			      -VM_hookscript "test1" \
+                              -exit_after_tracing 100000000      \
+							  -VM_name vm                 \
+							  -VM_hookscript "test1" \
                               -- $APPLICATION                \
                               & pid=$!
 
