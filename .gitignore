@@ -2,3 +2,4 @@ build/*
 debug/*
 *.sw?
 tags
+*.res
