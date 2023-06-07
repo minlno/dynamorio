@@ -458,9 +458,6 @@ static uint64_t vt_num_request = 0;
 static uint64_t vt_num_not_found = 0;
 static uint64_t tlb_misses = 0;
 
-static uint64_t num_range_found = 0;
-static uint64_t num_range_not_found = 0;
-
 bool
 cache_simulator_t::process_memref(const memref_t &memref)
 {
@@ -576,8 +573,8 @@ cache_simulator_t::process_memref(const memref_t &memref)
     new_memref.marker.pid = memref.marker.pid;
     new_memref.marker.tid = memref.marker.tid;
 
-    page_table_t::iterator guest_it = page_table.find(virtual_full_page_addr);
-    if (guest_it == page_table.end()) { // 1-level page fault
+    page_table_t::iterator gPT_it = page_table.find(virtual_full_page_addr);
+    if (gPT_it == page_table.end()) { // 1-level page fault
 	  num_not_found++;
       if (knobs.verbose >= 2) {
         std::cerr << "Error: cannot find translation for actual page table" << std::endl
@@ -597,8 +594,7 @@ cache_simulator_t::process_memref(const memref_t &memref)
 	}
 	vt_num_request++;
 
-	page_table_t::iterator it = host_page_table.find((guest_it->second.PA >> 12) << 12);
-	page_table_t::iterator last_it = it;
+	page_table_t::iterator it = host_page_table.find((gPT_it->second.PA >> 12) << 12);
 	if (it == host_page_table.end()) { // 2-level page fault
 vm_not_found:
       vt_num_not_found++;
@@ -609,7 +605,7 @@ vm_not_found:
               << "Vddr " << addr <<  std::endl
               << "VAddr >> 12 : " << virtual_page_addr << std::endl
               << "VAddr page_addr : " << (virtual_page_addr << 12) << std::endl
-              << "guest PE addr : " << ((guest_it->second.PA >> 12) << 12) << std::endl
+              << "guest PE addr : " << ((gPT_it->second.PA >> 12) << 12) << std::endl
               << std::dec
               << "VAddr page_offset : " << page_offset << std::endl
               << "num_requests : " << num_request << std::endl
@@ -635,64 +631,14 @@ vm_not_found:
         std::cerr << "TLB miss \n" << std::flush;
       }
 
-      bool range_found = true;
       // reset page walk results
       page_walk_res.clear();
 
-      cache_result_t gpwc_search_res = NOT_FOUND;
-      unsigned int gpwc_hit_level = 0;
-      memref_t gpwc_check_memref; 
-      gpwc_check_memref.data.type = TRACE_TYPE_READ;
-      gpwc_check_memref.data.size = 1;
-      // search PWC starting from highest level
-      for(unsigned int i = NUM_PWC; i >= 1; i--) {
-        gpwc_check_memref.data.addr = virtual_full_page_addr >> (12 + (4 - i) * 9);
-
-        gpwc_search_res = gpw_caches[i-1]->request(gpwc_check_memref, true /*Artemiy*/);
-        // if found, memorize and stop searching 
-        if (gpwc_search_res == FOUND_L1) {
-          if (gpwc_hit_level == 0) {
-            gpwc_hit_level = i;
-          }
-        }
-      }
-
-      for (unsigned int level_guest = 1; level_guest <= NUM_PAGE_TABLE_LEVELS; level_guest++) {
-        long long unsigned int page_offset_in_vpage = 8 * ((virtual_full_page_addr >> (12 + (4 - level_guest) * 9)) & ((1 << 9) - 1));
-        if (gpwc_hit_level < level_guest) {
-          // if not found in the PWC, then make a memory req
-          //one_pw_at_host(page_walk_res, *(guest_it->second.all[level_guest]) + 8 * ((virtual_full_page_addr >> (12 + (4 - level_guest) * 9)) & ((1 << 9) - 1)), level_guest, core);
-          if (!one_pw_at_host(page_walk_res, *(guest_it->second.all[level_guest]), 
-					          page_offset_in_vpage, level_guest, core))
-            goto vm_not_found;
-        } else if (gpwc_hit_level == level_guest) {
-          // if found in the PWC, indicate PWC_LAT
-          for (unsigned int i = 0; i < NUM_PAGE_TABLE_LEVELS; i++) {
-            page_walk_res.push_back(ZERO);
-          }
-          page_walk_res.push_back(PWC);
-
-        } else if (gpwc_hit_level > level_guest) {
-          // if skipped due to a PWC hit, indicate ZERO_LAT
-          for (unsigned int i = 0; i < NUM_PAGE_TABLE_LEVELS+1; i++) {
-            page_walk_res.push_back(ZERO);
-          }
-        }
-      }
-      it = last_it;
-      make_request(page_walk_res, TRACE_TYPE_PA_PE1, it->second.PE1, guest_it->second.PA + page_offset, 1, core);
-      make_request(page_walk_res, TRACE_TYPE_PA_PE2, it->second.PE2, guest_it->second.PA + page_offset, 2, core);
-      make_request(page_walk_res, TRACE_TYPE_PA_PE3, it->second.PE3, guest_it->second.PA + page_offset, 3, core);
-      make_request(page_walk_res, TRACE_TYPE_PA_PE4, it->second.PE4, guest_it->second.PA + page_offset, 4, core);
-
-
-      if (range_found) {
-        page_walk_res.push_back(RANGE_HIT);
-        num_range_found++;
-      } else {
-        page_walk_res.push_back(RANGE_MISS);
-        num_range_not_found++;
-      }
+	  // 2D page walk start
+	  if (!nested_page_walk(page_walk_res, virtual_full_page_addr,
+				            gPT_it, core)) {
+		  goto vm_not_found;
+	  }
 
       hm_full_statistic_t::iterator it = hm_full_statistic.find(page_walk_res);
       if (it != hm_full_statistic.end()) {
@@ -902,7 +848,8 @@ void cache_simulator_t::make_request(page_walk_hm_result_t& page_walk_res,
   memref_t page_walk_memref; 
 
   page_walk_memref.data.type = type;
-  page_walk_memref.data.addr = base_addr + 8 * ( ( addr_to_find >> (12 + (( 4 - level) * 9))) & ((1 << 9) - 1) );
+  page_walk_memref.data.addr = base_addr + 8 * 
+							 ( ( addr_to_find >> (12 + (( 4 - level) * 9))) & ((1 << 9) - 1) );
   page_walk_memref.data.size = 1; 
   page_walk_res.push_back(l1_dcaches[core]->request(page_walk_memref, true /* Artemiy -- get the source */));
   if (knobs.verbose >= 2) {
@@ -919,29 +866,10 @@ void cache_simulator_t::make_request(page_walk_hm_result_t& page_walk_res,
   return;
 }
 
-void cache_simulator_t::make_request_simple(trace_type_t type, long long unsigned int addr, int core)
-{
-  if (knobs.verbose >= 2) {
-    std::cerr << "Start make_request_simple" << type 
-    << " addr_to_find: " << addr
-    << std::endl;
-  }
-  memref_t page_walk_memref; 
-
-  page_walk_memref.data.type = type;
-  page_walk_memref.data.addr = addr ;
-  page_walk_memref.data.size = 1; 
-  page_walk_res.push_back(l1_dcaches[core]->request(page_walk_memref, true /* Artemiy -- get the source */));
-  if (knobs.verbose >= 2) {
-    std::cerr << "Done make_request_simple" << type 
-    << " final_addr: " << addr
-    << std::endl;
-  }
-  return;
-}
-
-bool cache_simulator_t::one_pw_at_host(page_walk_hm_result_t& page_walk_res, 
-                                       long long unsigned int guest_addr, 
+// Return false if page fault occurs
+bool 
+cache_simulator_t::one_pw_at_host(page_walk_hm_result_t& page_walk_res, 
+                                       long long unsigned int gpa, 
                                        long long unsigned int page_offset_in_vpage, 
                                        uint64_t level_guest, 
                                        int core) {
@@ -953,7 +881,7 @@ bool cache_simulator_t::one_pw_at_host(page_walk_hm_result_t& page_walk_res,
   pwc_check_memref.data.size = 1;
   // search PWC starting from highest level
   for(unsigned int i = NUM_PWC; i >= 1; i--) {
-    pwc_check_memref.data.addr = guest_addr >> (PAGE_OFFSET_SIZE + (4 - i) * 9);
+    pwc_check_memref.data.addr = gpa >> (PAGE_OFFSET_SIZE + (4 - i) * 9);
     pwc_search_res = pw_caches[i-1]->request(pwc_check_memref, true /*Artemiy*/);
     // if found, memorize and stop searching 
     if (pwc_search_res == FOUND_L1) {
@@ -962,20 +890,17 @@ bool cache_simulator_t::one_pw_at_host(page_walk_hm_result_t& page_walk_res,
       }
     }
   }
-  long long unsigned int page_offset_guest_addr_to_find = 0;
   // find a record in the host PT corresponding to the given guest address
-  page_table_t::iterator host_it = host_page_table.find((guest_addr >> PAGE_OFFSET_SIZE) << PAGE_OFFSET_SIZE);
-  page_offset_guest_addr_to_find = page_offset_in_vpage;
+  page_table_t::iterator host_it = host_page_table.find((gpa >> PAGE_OFFSET_SIZE) << PAGE_OFFSET_SIZE);
 
-  if (host_it == host_page_table.end()) {
+  if (host_it == host_page_table.end()) { // 2-level page fault
 	  //print_results();
-	  //std::cerr << "no ept mapping!! " << guest_addr << std::endl;
+	  //std::cerr << "no ept mapping!! " << gpa << std::endl;
 	  return false;
   }
                              
 
-  //long long unsigned int guest_addr_to_find = guest_addr + page_offset_guest_addr_to_find;
-  long long unsigned int guest_addr_to_find = guest_addr;
+  long long unsigned int guest_addr_to_find = gpa;
 
   for (unsigned int level_host = 1; level_host <= NUM_PAGE_TABLE_LEVELS; level_host++) {
     if (pwc_hit_level < level_host) {
@@ -995,10 +920,67 @@ bool cache_simulator_t::one_pw_at_host(page_walk_hm_result_t& page_walk_res,
       page_walk_res.push_back(ZERO);
     }
   }
-//  make_request_simple(TRACE_TYPE[level_guest][0], host_it->second.PA + page_offset_guest_addr_to_find, core);                                    // A5
 // Artemiy: reuse make_request for fetching 5,10,15,20 from memory 
 // 0 is passed as a stub
-  make_request(page_walk_res, TRACE_TYPE[level_guest][0], host_it->second.PA + page_offset_guest_addr_to_find, 0, 1, core);                                    // A5
+  if (level_guest != 0)
+    make_request(page_walk_res, TRACE_TYPE[level_guest][0], 
+			     host_it->second.PA + page_offset_in_vpage, 0, 1, core);
+  return true;
+}
+
+// Return false if page fault occurs
+bool 
+cache_simulator_t::nested_page_walk(page_walk_hm_result_t& page_walk_res,
+								uint64_t virtual_full_page_addr,
+								page_table_t::iterator gPT_it,
+								int core) 
+{
+  cache_result_t gpwc_search_res = NOT_FOUND;
+  unsigned int gpwc_hit_level = 0;
+  memref_t gpwc_check_memref; 
+  gpwc_check_memref.data.type = TRACE_TYPE_READ;
+  gpwc_check_memref.data.size = 1;
+  // search PWC starting from highest level
+  for(unsigned int i = NUM_PWC; i >= 1; i--) {
+    gpwc_check_memref.data.addr = virtual_full_page_addr >> (12 + (4 - i) * 9);
+    gpwc_search_res = gpw_caches[i-1]->request(gpwc_check_memref, true /*Artemiy*/);
+    // if found, memorize and stop searching 
+    if (gpwc_search_res == FOUND_L1) {
+      if (gpwc_hit_level == 0) {
+        gpwc_hit_level = i;
+      }
+    }
+  }
+
+  // level 1 is root (PML4)
+  for (unsigned int level_guest = 1; level_guest <= NUM_PAGE_TABLE_LEVELS; level_guest++) {
+    long long unsigned int page_offset_in_vpage = 
+						8 * ((virtual_full_page_addr >> (12 + (4 - level_guest) * 9)) & ((1 << 9) - 1));
+    if (gpwc_hit_level < level_guest) {
+      // if not found in the PWC, then make a memory req
+      if (!one_pw_at_host(page_walk_res, *(gPT_it->second.all[level_guest]), 
+			          page_offset_in_vpage, level_guest, core))
+		return false;
+    } else if (gpwc_hit_level == level_guest) {
+      // if found in the PWC, indicate PWC_LAT
+      for (unsigned int i = 0; i < NUM_PAGE_TABLE_LEVELS; i++) {
+        page_walk_res.push_back(ZERO);
+      }
+      page_walk_res.push_back(PWC);
+
+    } else if (gpwc_hit_level > level_guest) {
+      // if skipped due to a PWC hit, indicate ZERO_LAT
+      for (unsigned int i = 0; i < NUM_PAGE_TABLE_LEVELS+1; i++) {
+        page_walk_res.push_back(ZERO);
+      }
+    }
+  }
+  // host page walk for data gPA
+  if (!one_pw_at_host(page_walk_res, *(gPT_it->second.all[0]),
+			  0, // 0 is passed for stuff
+			  0, core))
+	  return false;
+
   return true;
 }
 
@@ -1084,9 +1066,6 @@ cache_simulator_t::print_results()
               << "vt_num_not_found : " << vt_num_not_found << std::endl
               << "tlb_misses : " << tlb_misses << std::endl;
 
-    std::cerr << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
-    std::cerr << "num_range_found : "     << num_range_found << std::endl 
-              << "num_range_not_found : " << num_range_not_found << std::endl;
     std::cerr << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
 
 #pragma GCC diagnostic push

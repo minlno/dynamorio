@@ -154,10 +154,14 @@ protected:
     void make_request(page_walk_hm_result_t& page_walk_res, trace_type_t type, long long unsigned int base_addr, long long unsigned int addr_to_find, int level, int core);
     void make_request_simple(trace_type_t type, long long unsigned int addr, int core);
     bool one_pw_at_host(page_walk_hm_result_t& page_walk_res, 
-				           long long unsigned int guest_addr, 
+				           long long unsigned int gpa, 
 				           long long unsigned int page_offset_in_vpage, 
 				           uint64_t level_guest, 
 				           int core);
+	bool nested_page_walk(page_walk_hm_result_t& page_walk_res, 
+						   uint64_t virtual_full_page_addr,
+						   page_table_t::iterator gPT_it,
+						   int core);
 
     // The following unordered maps map a cache's name to a pointer to it.
     std::unordered_map<std::string, cache_t *> llcaches;     // LLC(s)
