@@ -53,12 +53,17 @@ public:
     virtual cache_result_t
     request(const memref_t &memref_in, bool changed);
 
+    // Optimization: remember last pid in addition to last tag
+    memref_pid_t last_pid;
+
 protected:
     virtual void
     init_blocks();
 
-    // Optimization: remember last pid in addition to last tag
-    memref_pid_t last_pid;
+	virtual void
+    access_update(int block_idx, int way);
+	virtual int
+    replace_which_way(int block_idx);
 };
 
 #endif /* _TLB_H_ */

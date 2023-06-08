@@ -285,9 +285,9 @@ droption_t<unsigned int> op_TLB_L2_assoc(
 
 droption_t<std::string>
     op_TLB_replace_policy(DROPTION_SCOPE_FRONTEND, "TLB_replace_policy",
-                          REPLACE_POLICY_LFU, "TLB replacement policy",
+                          REPLACE_POLICY_LRU, "TLB replacement policy",
                           "Specifies the replacement policy for TLBs. "
-                          "Supported policies: LFU (Least Frequently Used).");
+                          "Supported policies: LFU, LRU.");
 
 droption_t<std::string> op_simulator_type(DROPTION_SCOPE_FRONTEND, "simulator_type",
                                           CPU_CACHE,

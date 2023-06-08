@@ -243,3 +243,39 @@ tlb_t::request(const memref_t &memref_in, bool is_gva, bool changed2)
     //std::cerr << "TLB return result after search " << prepare_to_return << std::endl; 
     return prepare_to_return;
 }
+
+void tlb_t::access_update(int block_idx, int way)
+{
+    int cnt = get_caching_device_block(block_idx, way).counter;
+    // Optimization: return early if it is a repeated access.
+    if (cnt == 0)
+        return;
+    // We inc all the counters that are not larger than cnt for LRU.
+    for (int i = 0; i < associativity; ++i) {
+        if (i != way && get_caching_device_block(block_idx, i).counter <= cnt)
+            get_caching_device_block(block_idx, i).counter++;
+    }
+    // Clear the counter for LRU.
+    get_caching_device_block(block_idx, way).counter = 0;
+}
+
+int
+tlb_t::replace_which_way(int block_idx)
+{
+    // We implement LRU by picking the slot with the largest counter value.
+    int max_counter = 0;
+    int max_way = 0;
+    for (int way = 0; way < associativity; ++way) {
+        if (get_caching_device_block(block_idx, way).tag == TAG_INVALID) {
+            max_way = way;
+            break;
+        }
+        if (get_caching_device_block(block_idx, way).counter > max_counter) {
+            max_counter = get_caching_device_block(block_idx, way).counter;
+            max_way = way;
+        }
+    }
+    // Set to non-zero for later access_update optimization on repeated access
+    get_caching_device_block(block_idx, max_way).counter = 1;
+    return max_way;
+}
