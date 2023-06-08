@@ -53,7 +53,7 @@ public:
     print_results();
 
     std::pair<bool,bool> 
-    process_memref(const memref_t &memref, bool changed); //Added by Artemiy
+    process_memref(const memref_t &memref, bool is_gva);
 
 protected:
     // Create a tlb_t object with a specific replacement policy.

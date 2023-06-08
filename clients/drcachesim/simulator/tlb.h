@@ -48,7 +48,7 @@ public:
     request(const memref_t &memref);
 
     virtual bool
-    request(const memref_t &memref, bool changed1, bool changed2);
+    request(const memref_t &memref, bool is_gva, bool changed2);
 
     virtual cache_result_t
     request(const memref_t &memref_in, bool changed);

@@ -157,11 +157,11 @@ protected:
 				           long long unsigned int gpa, 
 				           long long unsigned int page_offset_in_vpage, 
 				           uint64_t level_guest, 
-				           int core);
+				           int core, memref_t memref);
 	bool nested_page_walk(page_walk_hm_result_t& page_walk_res, 
 						   uint64_t virtual_full_page_addr,
 						   page_table_t::iterator gPT_it,
-						   int core);
+						   int core, memref_t memref);
 
     // The following unordered maps map a cache's name to a pointer to it.
     std::unordered_map<std::string, cache_t *> llcaches;     // LLC(s)

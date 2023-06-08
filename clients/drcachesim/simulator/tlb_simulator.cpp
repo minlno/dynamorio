@@ -131,7 +131,7 @@ return true;
 // returns: first done
 // second: hit/miss
 std::pair<bool, bool>
-tlb_simulator_t::process_memref(const memref_t &memref, bool changed)
+tlb_simulator_t::process_memref(const memref_t &memref, bool is_gva)
 {
     if (knobs.skip_refs > 0) {
         knobs.skip_refs--;
@@ -175,14 +175,14 @@ tlb_simulator_t::process_memref(const memref_t &memref, bool changed)
 
     if (type_is_instr(memref.instr.type)) {
         //std::cerr << "Checking ITLB for addr " << std::hex << memref.instr.addr << std::dec << "...";
-        found = itlbs[core]->request(memref, true, true /* Artemiy change */ );
+        found = itlbs[core]->request(memref, is_gva, true /* Artemiy change */ );
         if (knobs.verbose >= 2) {
           std::cerr << "found in ITLB: " << found << std::endl;
         }
     }
     else if (memref.data.type == TRACE_TYPE_READ || memref.data.type == TRACE_TYPE_WRITE) {
         //std::cerr << "Checking DTLB for addr " << std::hex << memref.data.addr << std::dec << "...";
-        found = dtlbs[core]->request(memref, true, true /* Artemiy change */ );
+        found = dtlbs[core]->request(memref, is_gva, true /* Artemiy change */ );
         if (knobs.verbose >= 2) {
           std::cerr << "found in DTLB: " << found << std::endl;
         }

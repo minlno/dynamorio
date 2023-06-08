@@ -140,7 +140,7 @@ tlb_t::request(const memref_t &memref_in)
 
 //Artemiy copypaste
 bool
-tlb_t::request(const memref_t &memref_in, bool changed1, bool changed2)
+tlb_t::request(const memref_t &memref_in, bool is_gva, bool changed2)
 {
     // XXX: any better way to derive caching_device_t::request?
     // Since pid is needed in a lot of places from the beginning to the end,
@@ -157,6 +157,17 @@ tlb_t::request(const memref_t &memref_in, bool changed1, bool changed2)
     addr_t final_tag = compute_tag(final_addr);
     addr_t tag = compute_tag(memref_in.data.addr);
     memref_pid_t pid = memref_in.data.pid;
+
+	if (tag & (1UL << 63))
+		std::cerr << "tag 63 bit is set!" << std::endl;
+
+	if (is_gva) {
+		final_tag = final_tag & 0x7fffffffffffffff;
+		tag = tag & 0x7fffffffffffffff;
+	} else {
+		final_tag = final_tag | (1UL << 63);
+		tag = tag | (1UL << 63);
+	}
 
     // Optimization: check last tag and pid if single-block
     if (tag == final_tag && tag == last_tag && pid == last_pid) {
@@ -201,7 +212,7 @@ tlb_t::request(const memref_t &memref_in, bool changed1, bool changed2)
             bool result = false;
             if (parent != NULL) {
                 parent->get_stats()->child_access(memref, false);
-                result = parent->request(memref, true, true /* changed */);
+                result = parent->request(memref, is_gva, true /* changed */);
                 //Artemiy add return translation not found in the TLBs
                 //std::cerr << "TLB get result from parent " << result << std::endl; 
                 prepare_to_return = result;

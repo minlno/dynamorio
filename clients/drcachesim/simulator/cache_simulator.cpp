@@ -567,12 +567,7 @@ cache_simulator_t::process_memref(const memref_t &memref)
       std::cerr << __FUNCTION__ << " Received TLB result: " << is_TLB_hit << std::endl;
     }
 
-    memref_t new_memref; 
-    new_memref = memref;
-    new_memref.marker.type = memref.marker.type;
-    new_memref.marker.pid = memref.marker.pid;
-    new_memref.marker.tid = memref.marker.tid;
-
+	// guest PT lookup for cheking page fault
     page_table_t::iterator gPT_it = page_table.find(virtual_full_page_addr);
     if (gPT_it == page_table.end()) { // 1-level page fault
 	  num_not_found++;
@@ -592,10 +587,11 @@ cache_simulator_t::process_memref(const memref_t &memref)
       }
       return true;
 	}
-	vt_num_request++;
 
-	page_table_t::iterator it = host_page_table.find((gPT_it->second.PA >> 12) << 12);
-	if (it == host_page_table.end()) { // 2-level page fault
+	// host PT lookup for cheking page fault
+	vt_num_request++;
+	page_table_t::iterator hPT_it = host_page_table.find((gPT_it->second.PA >> 12) << 12);
+	if (hPT_it == host_page_table.end()) { // 2-level page fault
 vm_not_found:
       vt_num_not_found++;
       if (knobs.verbose >= 2) {
@@ -615,14 +611,6 @@ vm_not_found:
       }
       return true;
     }
-	      
-	physical_page_addr = it->second.PA;
-
-	if (type_is_instr(memref.instr.type) || memref.instr.type == TRACE_TYPE_PREFETCH_INSTR) {
-      new_memref.instr.addr = physical_page_addr + page_offset;
-	} else if (memref.data.type == TRACE_TYPE_READ || memref.data.type == TRACE_TYPE_WRITE || type_is_prefetch(memref.data.type)) {
-      new_memref.data.addr  = physical_page_addr + page_offset;
-	}
 
     // process TLB miss
     if (!is_TLB_hit) {
@@ -636,18 +624,31 @@ vm_not_found:
 
 	  // 2D page walk start
 	  if (!nested_page_walk(page_walk_res, virtual_full_page_addr,
-				            gPT_it, core)) {
+				            gPT_it, core, memref)) {
 		  goto vm_not_found;
 	  }
 
-      hm_full_statistic_t::iterator it = hm_full_statistic.find(page_walk_res);
-      if (it != hm_full_statistic.end()) {
-        it->second++;
+      hm_full_statistic_t::iterator hm_it = hm_full_statistic.find(page_walk_res);
+      if (hm_it != hm_full_statistic.end()) {
+        hm_it->second++;
       } else {
         hm_full_statistic.insert(std::make_pair(page_walk_res, 1));
       }
     } // end processing TLB miss
 
+
+	// memory hiearchy reference start using hpa
+	physical_page_addr = hPT_it->second.PA;
+    memref_t new_memref; 
+    new_memref = memref;
+    new_memref.marker.type = memref.marker.type;
+    new_memref.marker.pid = memref.marker.pid;
+    new_memref.marker.tid = memref.marker.tid;
+	if (type_is_instr(memref.instr.type) || memref.instr.type == TRACE_TYPE_PREFETCH_INSTR) {
+      new_memref.instr.addr = physical_page_addr + page_offset;
+	} else if (memref.data.type == TRACE_TYPE_READ || memref.data.type == TRACE_TYPE_WRITE || type_is_prefetch(memref.data.type)) {
+      new_memref.data.addr  = physical_page_addr + page_offset;
+	}
     cache_result_t search_res;
     if (type_is_instr(new_memref.instr.type) ||
         new_memref.instr.type == TRACE_TYPE_PREFETCH_INSTR) {
@@ -872,11 +873,36 @@ cache_simulator_t::one_pw_at_host(page_walk_hm_result_t& page_walk_res,
                                        long long unsigned int gpa, 
                                        long long unsigned int page_offset_in_vpage, 
                                        uint64_t level_guest, 
-                                       int core) {
-
-  cache_result_t pwc_search_res = NOT_FOUND;
-  unsigned int pwc_hit_level = 0;
+                                       int core,
+									   memref_t memref) 
+{
+  unsigned int pwc_hit_level;
   memref_t pwc_check_memref; 
+  cache_result_t pwc_search_res;
+  page_table_t::iterator host_it;
+  // find a record in the host PT corresponding to the given guest address
+  host_it = host_page_table.find((gpa >> PAGE_OFFSET_SIZE) << PAGE_OFFSET_SIZE);
+
+  if (host_it == host_page_table.end()) { // 2-level page fault
+	  //print_results();
+	  //std::cerr << "no ept mapping!! " << gpa << std::endl;
+	  return false;
+  }
+
+  // TODO: lookup TLB with gpa
+  memref.data.addr = gpa;
+  std::pair<bool, bool> res = tlb_sim->process_memref(memref, false /*gPA*/);
+  bool is_Tlb_hit = res.second;
+  if (is_Tlb_hit) {
+	  for (unsigned int i = 1; i <= NUM_PAGE_TABLE_LEVELS; i++)
+		  page_walk_res.push_back(ZERO);
+	  goto gpa_tlb_hit;
+  }
+
+  // gpa TLB miss process
+  // lookup PWC first
+  pwc_search_res = NOT_FOUND;
+  pwc_hit_level = 0;
   pwc_check_memref.data.type = TRACE_TYPE_READ;
   pwc_check_memref.data.size = 1;
   // search PWC starting from highest level
@@ -890,25 +916,15 @@ cache_simulator_t::one_pw_at_host(page_walk_hm_result_t& page_walk_res,
       }
     }
   }
-  // find a record in the host PT corresponding to the given guest address
-  page_table_t::iterator host_it = host_page_table.find((gpa >> PAGE_OFFSET_SIZE) << PAGE_OFFSET_SIZE);
-
-  if (host_it == host_page_table.end()) { // 2-level page fault
-	  //print_results();
-	  //std::cerr << "no ept mapping!! " << gpa << std::endl;
-	  return false;
-  }
-                             
-
-  long long unsigned int guest_addr_to_find = gpa;
-
+  // host page table walking start
+  // level 1 is root (PML4)
   for (unsigned int level_host = 1; level_host <= NUM_PAGE_TABLE_LEVELS; level_host++) {
     if (pwc_hit_level < level_host) {
       // if not found in the PWC, then make a memory req
       make_request(page_walk_res, 
                    TRACE_TYPE[level_guest][level_host], 
                    *(host_it->second.all[level_host]), 
-                   guest_addr_to_find, 
+                   gpa, 
                    level_host, 
                    core); 
     } else if (pwc_hit_level == level_host) {
@@ -920,6 +936,8 @@ cache_simulator_t::one_pw_at_host(page_walk_hm_result_t& page_walk_res,
       page_walk_res.push_back(ZERO);
     }
   }
+
+gpa_tlb_hit:
 // Artemiy: reuse make_request for fetching 5,10,15,20 from memory 
 // 0 is passed as a stub
   if (level_guest != 0)
@@ -933,7 +951,8 @@ bool
 cache_simulator_t::nested_page_walk(page_walk_hm_result_t& page_walk_res,
 								uint64_t virtual_full_page_addr,
 								page_table_t::iterator gPT_it,
-								int core) 
+								int core,
+								memref_t memref)
 {
   cache_result_t gpwc_search_res = NOT_FOUND;
   unsigned int gpwc_hit_level = 0;
@@ -959,7 +978,7 @@ cache_simulator_t::nested_page_walk(page_walk_hm_result_t& page_walk_res,
     if (gpwc_hit_level < level_guest) {
       // if not found in the PWC, then make a memory req
       if (!one_pw_at_host(page_walk_res, *(gPT_it->second.all[level_guest]), 
-			          page_offset_in_vpage, level_guest, core))
+			          page_offset_in_vpage, level_guest, core, memref))
 		return false;
     } else if (gpwc_hit_level == level_guest) {
       // if found in the PWC, indicate PWC_LAT
@@ -978,7 +997,7 @@ cache_simulator_t::nested_page_walk(page_walk_hm_result_t& page_walk_res,
   // host page walk for data gPA
   if (!one_pw_at_host(page_walk_res, *(gPT_it->second.all[0]),
 			  0, // 0 is passed for stuff
-			  0, core))
+			  0, core, memref))
 	  return false;
 
   return true;
