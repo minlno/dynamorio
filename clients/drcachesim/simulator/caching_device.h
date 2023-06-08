@@ -107,6 +107,8 @@ protected:
     access_update(int block_idx, int way);
     virtual int
     replace_which_way(int block_idx);
+    virtual int
+    replace_which_way(int block_idx, int start, int end);
 
     inline addr_t
     compute_tag(addr_t addr)

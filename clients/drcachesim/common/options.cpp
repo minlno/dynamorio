@@ -283,6 +283,26 @@ droption_t<unsigned int> op_TLB_L2_assoc(
     DROPTION_SCOPE_FRONTEND, "TLB_L2_assoc", 4, "L2 TLB associativity",
     "Specifies the associativity of each unified L2 TLB.  Must be a power of 2.");
 
+droption_t<bool> op_static(
+	DROPTION_SCOPE_FRONTEND, "static", false, "Static partitioning boolean option",
+	"Static partitioning");
+
+droption_t<int> op_gpa_way(
+    DROPTION_SCOPE_FRONTEND, "gpa_way", 0, "Number of way fo gpa entry in L2 TLB",
+	"gpa way");
+
+droption_t<bool> op_NTLB(
+	DROPTION_SCOPE_FRONTEND, "NTLB", false, "NTLB boolean option",
+	"Specifies whether using NTLB for gpa tlb lookup.");
+
+droption_t<unsigned int> op_NTLB_entries(
+    DROPTION_SCOPE_FRONTEND, "NTLB_entries", 16, "Number of entries in NTLB",
+    "Specifies the number of entries in each NTLB.  Must be a power of 2.");
+
+droption_t<unsigned int> op_NTLB_assoc(
+    DROPTION_SCOPE_FRONTEND, "NTLB_assoc", 16, "NTLB associativity",
+    "Specifies the associativity of each NTLB.  Must be a power of 2.");
+
 droption_t<std::string>
     op_TLB_replace_policy(DROPTION_SCOPE_FRONTEND, "TLB_replace_policy",
                           REPLACE_POLICY_LRU, "TLB replacement policy",

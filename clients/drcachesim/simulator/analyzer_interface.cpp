@@ -127,12 +127,17 @@ get_tlb_simulator_knobs()
     tlb_simulator_knobs_t *knobs = new tlb_simulator_knobs_t;
     knobs->num_cores = op_num_cores.get_value();
     knobs->page_size = op_page_size.get_value();
+	knobs->use_NTLB = op_NTLB.get_value();
+	knobs->NTLB_entries = op_NTLB_entries.get_value();
+	knobs->NTLB_assoc = op_NTLB_assoc.get_value();
     knobs->TLB_L1I_entries = op_TLB_L1I_entries.get_value();
     knobs->TLB_L1D_entries = op_TLB_L1D_entries.get_value();
     knobs->TLB_L1I_assoc = op_TLB_L1I_assoc.get_value();
     knobs->TLB_L1D_assoc = op_TLB_L1D_assoc.get_value();
     knobs->TLB_L2_entries = op_TLB_L2_entries.get_value();
     knobs->TLB_L2_assoc = op_TLB_L2_assoc.get_value();
+	knobs->is_static = op_static.get_value();
+	knobs->gpa_way = op_gpa_way.get_value();
     knobs->TLB_replace_policy = op_TLB_replace_policy.get_value();
     knobs->skip_refs = op_skip_refs.get_value();
     knobs->warmup_refs = op_warmup_refs.get_value();

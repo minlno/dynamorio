@@ -61,10 +61,12 @@ tlb_simulator_t::tlb_simulator_t(const tlb_simulator_knobs_t &knobs_)
     itlbs = new tlb_t *[knobs.num_cores];
     dtlbs = new tlb_t *[knobs.num_cores];
     lltlbs = new tlb_t *[knobs.num_cores];
+    ntlbs = new tlb_t *[knobs.num_cores];
     for (unsigned int i = 0; i < knobs.num_cores; i++) {
         itlbs[i] = NULL;
         dtlbs[i] = NULL;
         lltlbs[i] = NULL;
+		ntlbs[i] = NULL;
     }
     for (unsigned int i = 0; i < knobs.num_cores; i++) {
         itlbs[i] = create_tlb(knobs.TLB_replace_policy);
@@ -85,18 +87,31 @@ tlb_simulator_t::tlb_simulator_t(const tlb_simulator_knobs_t &knobs_)
             success = false;
             return;
         }
+		ntlbs[i] = create_tlb(knobs.TLB_replace_policy);
+		if (ntlbs[i] == NULL) {
+			error_string = "Failed to create ntlbs";
+			success = false;
+			return;
+		}
 
         if (!itlbs[i]->init(knobs.TLB_L1I_assoc, (int)knobs.page_size,
                             knobs.TLB_L1I_entries, lltlbs[i], new tlb_stats_t) ||
             !dtlbs[i]->init(knobs.TLB_L1D_assoc, (int)knobs.page_size,
                             knobs.TLB_L1D_entries, lltlbs[i], new tlb_stats_t) ||
             !lltlbs[i]->init(knobs.TLB_L2_assoc, (int)knobs.page_size,
-                             knobs.TLB_L2_entries, NULL, new tlb_stats_t)) {
+                             knobs.TLB_L2_entries, NULL, new tlb_stats_t) ||
+			!ntlbs[i]->init(knobs.NTLB_assoc, (int)knobs.page_size,
+							knobs.NTLB_entries, NULL, new tlb_stats_t)) {
             error_string = "Usage error: failed to initialize TLBs. Ensure entry number, "
                            "page size and associativity are powers of 2.";
             success = false;
             return;
         }
+		itlbs[i]->is_static = false;
+		dtlbs[i]->is_static = false;
+		lltlbs[i]->is_static = knobs.is_static;
+		lltlbs[i]->gpa_way = knobs.gpa_way;
+		ntlbs[i]->is_static = false;
     }
 }
 
@@ -116,10 +131,15 @@ tlb_simulator_t::~tlb_simulator_t()
             return;
         delete lltlbs[i]->get_stats();
         delete lltlbs[i];
+		if (ntlbs[i] == NULL)
+			return;
+		delete ntlbs[i]->get_stats();
+		delete ntlbs[i];
     }
     delete[] itlbs;
     delete[] dtlbs;
     delete[] lltlbs;
+	delete[] ntlbs;
 }
 
 bool
@@ -174,15 +194,23 @@ tlb_simulator_t::process_memref(const memref_t &memref, bool is_gva)
     bool found = false;
 
     if (type_is_instr(memref.instr.type)) {
-        //std::cerr << "Checking ITLB for addr " << std::hex << memref.instr.addr << std::dec << "...";
-        found = itlbs[core]->request(memref, is_gva, true /* Artemiy change */ );
+		if (is_gva)
+			found = itlbs[core]->request(memref, is_gva, true);
+		else if (knobs.use_NTLB) 
+			found = ntlbs[core]->request(memref, is_gva, true);
+		else
+			found = lltlbs[core]->request(memref, is_gva, true);
         if (knobs.verbose >= 2) {
           std::cerr << "found in ITLB: " << found << std::endl;
         }
     }
     else if (memref.data.type == TRACE_TYPE_READ || memref.data.type == TRACE_TYPE_WRITE) {
-        //std::cerr << "Checking DTLB for addr " << std::hex << memref.data.addr << std::dec << "...";
-        found = dtlbs[core]->request(memref, is_gva, true /* Artemiy change */ );
+		if (is_gva)
+			found = dtlbs[core]->request(memref, is_gva, true);
+		else if (knobs.use_NTLB)
+			found = ntlbs[core]->request(memref, is_gva, true);
+		else
+			found = lltlbs[core]->request(memref, is_gva, true);
         if (knobs.verbose >= 2) {
           std::cerr << "found in DTLB: " << found << std::endl;
         }
@@ -219,6 +247,7 @@ tlb_simulator_t::process_memref(const memref_t &memref, bool is_gva)
                 itlbs[i]->get_stats()->reset();
                 dtlbs[i]->get_stats()->reset();
                 lltlbs[i]->get_stats()->reset();
+				ntlbs[i]->get_stats()->reset();
             }
         }
     } else {
@@ -240,6 +269,8 @@ tlb_simulator_t::print_results()
             dtlbs[i]->get_stats()->print_stats("    ");
             std::cerr << "  TLB-LL stats:" << std::endl;
             lltlbs[i]->get_stats()->print_stats("    ");
+            std::cerr << "  NTLB stats:" << std::endl;
+            ntlbs[i]->get_stats()->print_stats("    ");
         }
     }
     return true;

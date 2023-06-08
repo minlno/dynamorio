@@ -67,6 +67,7 @@ protected:
     tlb_t **itlbs;
     tlb_t **dtlbs;
     tlb_t **lltlbs;
+	tlb_t **ntlbs;
 };
 
 #endif /* _TLB_SIMULATOR_H_ */

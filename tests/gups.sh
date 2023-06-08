@@ -22,5 +22,7 @@ $SIMULATOR_DIR/build/bin64/drrun -t drcachesim \
 					-L2_assoc 8 \
 					-LL_size $(( 16 * 1024 * 1024)) \
 					-LL_assoc 16 \
+					-static -gpa_way 6 \
 					> $OUTPUT_FILE 2>&1 & pid=$! &
+					#-NTLB \
 					#-verbose 2

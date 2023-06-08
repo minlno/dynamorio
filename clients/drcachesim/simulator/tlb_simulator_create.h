@@ -52,13 +52,18 @@ struct tlb_simulator_knobs_t {
     tlb_simulator_knobs_t()
         : num_cores(4)
         , page_size(4 * 1024)
+		, use_NTLB(false)
+		, NTLB_entries(16)
+		, NTLB_assoc(16)
         , TLB_L1I_entries(32)
         , TLB_L1D_entries(32)
         , TLB_L1I_assoc(32)
         , TLB_L1D_assoc(32)
         , TLB_L2_entries(1024)
         , TLB_L2_assoc(4)
-        , TLB_replace_policy("LFU")
+		, is_static(false)
+		, gpa_way(0)
+        , TLB_replace_policy("LRU")
         , skip_refs(0)
         , warmup_refs(0)
         , warmup_fraction(0.0)
@@ -69,12 +74,17 @@ struct tlb_simulator_knobs_t {
     }
     unsigned int num_cores;
     uint64_t page_size;
+	bool use_NTLB;
+	unsigned int NTLB_entries;
+	unsigned int NTLB_assoc;
     unsigned int TLB_L1I_entries;
     unsigned int TLB_L1D_entries;
     unsigned int TLB_L1I_assoc;
     unsigned int TLB_L1D_assoc;
     unsigned int TLB_L2_entries;
     unsigned int TLB_L2_assoc;
+	bool is_static;
+	int gpa_way;
     std::string TLB_replace_policy;
     uint64_t skip_refs;
     uint64_t warmup_refs;

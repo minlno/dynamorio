@@ -118,6 +118,12 @@ caching_device_t::request(const memref_t &memref_in, bool changed1, bool changed
   // for TLB, its has its own impl
   assert(0);
 }
+int
+caching_device_t::replace_which_way(int block_idx, int start, int end)
+{
+  // for TLB, its has its own impl
+  assert(0);
+}
 
   // for cache
 cache_result_t

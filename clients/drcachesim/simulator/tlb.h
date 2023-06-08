@@ -56,6 +56,10 @@ public:
     // Optimization: remember last pid in addition to last tag
     memref_pid_t last_pid;
 
+	bool is_static;
+
+	int gpa_way;
+
 protected:
     virtual void
     init_blocks();
@@ -63,7 +67,7 @@ protected:
 	virtual void
     access_update(int block_idx, int way);
 	virtual int
-    replace_which_way(int block_idx);
+    replace_which_way(int block_idx, int start, int end);
 };
 
 #endif /* _TLB_H_ */
