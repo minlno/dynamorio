@@ -3,3 +3,5 @@ debug/*
 *.sw?
 tags
 *.res
+motivation/*
+evaluation/*
