@@ -31,8 +31,8 @@
 
 #define NUM_PWC 3
 #define PWC_ENTRY_SIZE 8
-const unsigned int PWC_ASSOC[] = { 1, 4, 4};
-const unsigned int PWC_SIZE[] = { PWC_ENTRY_SIZE * 2, PWC_ENTRY_SIZE * 4, PWC_ENTRY_SIZE * 32};
+const unsigned int PWC_ASSOC[] = { 4, 4, 24};
+const unsigned int PWC_SIZE[] = { PWC_ENTRY_SIZE * 4, PWC_ENTRY_SIZE * 4, PWC_ENTRY_SIZE * 24};
 
 #define NUM_PAGE_TABLE_LEVELS 4
 #define PAGE_TABLE_ENTRY_SIZE 8 
@@ -890,13 +890,15 @@ cache_simulator_t::one_pw_at_host(page_walk_hm_result_t& page_walk_res,
   }
 
   // TODO: lookup TLB with gpa
-  memref.data.addr = gpa;
-  std::pair<bool, bool> res = tlb_sim->process_memref(memref, false /*gPA*/);
-  bool is_Tlb_hit = res.second;
-  if (is_Tlb_hit) {
+  if (level_guest != 0) {
+    memref.data.addr = gpa;
+    std::pair<bool, bool> res = tlb_sim->process_memref(memref, false /*gPA*/);
+    bool is_Tlb_hit = res.second;
+    if (is_Tlb_hit) {
 	  for (unsigned int i = 1; i <= NUM_PAGE_TABLE_LEVELS; i++)
-		  page_walk_res.push_back(ZERO);
+		page_walk_res.push_back(ZERO);
 	  goto gpa_tlb_hit;
+	}
   }
 
   // gpa TLB miss process
@@ -1103,6 +1105,7 @@ cache_simulator_t::print_results()
     };
 #pragma GCC diagnostic pop 
 	uint64_t page_walks = 0;
+    std::cerr << "Page-Walk-Traces start" << std::endl;
     for (hm_full_statistic_t::iterator it = hm_full_statistic.begin(); it != hm_full_statistic.end(); it++) {
       for(unsigned int i = 0; i < it->first.size(); i++) {
         std::cerr << print_hm_stats[it->first[i]] << ",";
@@ -1110,6 +1113,7 @@ cache_simulator_t::print_results()
       std::cerr << "\t" << it->second << std::endl;
 	  page_walks += it->second;
     }
+    std::cerr << "Page-Walk-Traces end" << std::endl;
     std::cerr << "total page walks: " << page_walks << std::endl;
 
     return true;
