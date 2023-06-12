@@ -77,6 +77,10 @@ tlb_t::request(const memref_t &memref_in, bool is_gva, bool changed2)
 
     bool prepare_to_return = false;
     memref = memref_in;
+	if (is_gva)
+		memref.data.type = TRACE_TYPE_gVA;
+	else
+		memref.data.type = TRACE_TYPE_gPA;
     int way;
     int block_idx = compute_block_idx(tag);
 	int start = 0;

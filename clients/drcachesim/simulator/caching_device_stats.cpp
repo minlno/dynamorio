@@ -50,8 +50,8 @@ caching_device_stats_t::caching_device_stats_t(const std::string &miss_file,
     , warmup_enabled(warmup_enabled)
     , file(nullptr)
 {
-    hit_statistics.resize (PAGE_WALK_STAGES + 2 /* for contention */, 0);
-    miss_statistics.resize(PAGE_WALK_STAGES + 2 /* for contention */, 0);
+    hit_statistics.resize (PAGE_WALK_STAGES + 4 /* for contention, gPA, gVA */, 0);
+    miss_statistics.resize(PAGE_WALK_STAGES + 4 /* for contention, gPA, gVA */, 0);
 
     if (miss_file.empty()) {
         dump_misses = false;
@@ -95,7 +95,14 @@ caching_device_stats_t::access(const memref_t &memref, bool hit)
           hit_statistics[5]++;
           return;
         } 
-
+        if (memref.data.type == TRACE_TYPE_gPA) {
+          hit_statistics[6]++;
+          return;
+        } 
+        if (memref.data.type == TRACE_TYPE_gVA) {
+          hit_statistics[7]++;
+          return;
+        } 
         if (memref.data.type == TRACE_TYPE_PE1) {
           hit_statistics[0]++;
           return;
@@ -121,6 +128,14 @@ caching_device_stats_t::access(const memref_t &memref, bool hit)
         } 
         if (memref.data.type == TRACE_TYPE_CONT_LLC) {
           miss_statistics[5]++;
+          return;
+        } 
+        if (memref.data.type == TRACE_TYPE_gPA) {
+          miss_statistics[6]++;
+          return;
+        } 
+        if (memref.data.type == TRACE_TYPE_gVA) {
+          miss_statistics[7]++;
           return;
         } 
         if (memref.data.type == TRACE_TYPE_PE1) {
@@ -198,6 +213,7 @@ caching_device_stats_t::print_counts(std::string prefix)
     std::cerr << prefix << std::setw(18) << std::left << "Invalidations:" << std::setw(20)
               << std::right << num_inclusive_invalidates << std::endl;
 
+	/*
     for (uint i = 0; i < PAGE_WALK_STAGES + 2; i++) {
       std::cerr << prefix << std::setw(18) << std::left << "Hits PT level" << (i+1) << ":" << std::setw(20)
                 << std::right << hit_statistics[i] << std::endl;
@@ -205,6 +221,15 @@ caching_device_stats_t::print_counts(std::string prefix)
       std::cerr << prefix << std::setw(18) << std::left << "Misses PT level" << (i+1) << ":" << std::setw(20)
                 << std::right << miss_statistics[i] << std::endl;
     }
+	*/
+    std::cerr << prefix << std::setw(18) << std::left << "gPA Hits:" << std::setw(20)
+              << std::right << hit_statistics[6] << std::endl;
+    std::cerr << prefix << std::setw(18) << std::left << "gPA Misses:" << std::setw(20)
+              << std::right << miss_statistics[6] << std::endl;
+    std::cerr << prefix << std::setw(18) << std::left << "gVA Hits:" << std::setw(20)
+              << std::right << hit_statistics[7] << std::endl;
+    std::cerr << prefix << std::setw(18) << std::left << "gVA Misses:" << std::setw(20)
+              << std::right << miss_statistics[7] << std::endl;
 }
 
 void

@@ -108,6 +108,9 @@ typedef enum {
     TRACE_TYPE_CONT_L1,  /**< A data load. */
     TRACE_TYPE_CONT_LLC,  /**< A data load. */
 
+	TRACE_TYPE_gPA,
+	TRACE_TYPE_gVA,
+
     TRACE_TYPE_PREFETCH, /**< A general prefetch to the level 1 data cache. */
     // X86 specific prefetch
     TRACE_TYPE_PREFETCHT0,  /**< An x86 prefetch to all levels of the cache. */
