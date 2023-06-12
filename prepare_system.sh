@@ -29,13 +29,13 @@ prepare_system() {
 	sync; echo 3 > /proc/sys/vm/drop_caches
 
 	echo -n "Chekicng if dump PT module loaded..."
-	if [ -z "$(cat /proc/modules | grep dump_pagetables)" ];
+	if [ -z "$(cat /proc/modules | grep page_table_dump)" ];
 	then
 		echo "not found"
 		echo -n "Install dump PT module..."
-		SOURCE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"/source
-		cd $SOURCE_DIR/dump_pagetables
-		make > install.log 2>&1 && insmod dump_pagetables.ko
+		SOURCE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"/mitosis-page-table-dump/
+		cd $SOURCE_DIR/kernel-module
+		make > install.log 2>&1 && insmod page-table-dump.ko
 		check_if_succeeded
 	fi && echo "found. OK"
 }

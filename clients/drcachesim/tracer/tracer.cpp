@@ -575,7 +575,7 @@ memtrace(void *drcontext, bool skip_size_cap)
             }
             if (!pageTableWasDumped) {
               std::cerr << "Page table dump module was attached to PID=" << std::to_string(getpid()) << std::endl;
-			  system((std::string("/root/mitosis-page-table-dump/bin/page-table-dump ")
+			  system((std::string("/root/workspace/tracer-mh/mitosis-page-table-dump/bin/page-table-dump ")
 						  + std::to_string(getpid()) + std::string(" 0 > ")
 						  + op_outdir.get_value().c_str() + "/pt_dump_raw").c_str());
               system((std::string("cat /proc/" + std::to_string(getpid()) + "/maps > ") + op_outdir.get_value().c_str() + "/proc_maps").c_str());
