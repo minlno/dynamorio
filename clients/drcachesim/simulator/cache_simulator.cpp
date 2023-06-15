@@ -819,6 +819,7 @@ vm_not_found:
         }
         //clear the hm_statistic_map
         hm_full_statistic.clear(); 
+		tlb_misses = 0;
     } else {
         knobs.sim_refs--;
     }
