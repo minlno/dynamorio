@@ -1,4 +1,9 @@
 #/bin/bash 
+# ./run.sh app_name
+source ./workloads.sh
+app=$1
+cmd=${cmds[${app}]}
+enabler=${enabler[${app}]}
 
 # Auxilary functions section 
 kill_descendant_processes() {
@@ -26,22 +31,20 @@ trap sigint SIGINT
 
 # MAIN SETTINGS SECTION
 # Example:
-OUTPUT_DIR=/root/workspace/traces/gups
-APPLICATION="/root/workspace/apps/gups/gups 65536"
+ENABLE_FILE=$enabler
+OUTPUT_DIR=/root/workspace/traces/$app
+APPLICATION=$cmd
 
 rm -rf $OUTPUT_DIR
+rm -rf $ENABLE_FILE
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-ENABLE_FILE=/tmp/$RANDOM
 echo 0 > $ENABLE_FILE 
 
 $TRACER_DIR/generate_trace.sh --output_dir=$OUTPUT_DIR --enabler_file=$ENABLE_FILE $APPLICATION 2>&1 & pid=$!
 # wait for application to warm up
-sleep 240
-
 #once the application is warmed up 
-echo 1 > $ENABLE_FILE 
 wait $pid
 
 # postprocess page table dump:
